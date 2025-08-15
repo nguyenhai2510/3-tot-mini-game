@@ -17,9 +17,10 @@ const Modal: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose
   useEffect(() => {
     if (!containerRef.current) return;
     const update = () => {
-      const parentW = containerRef.current ? containerRef.current.clientWidth : window.innerWidth;
-      // clamp width min/max (adjust min/max as needed)
-      const w = Math.round(Math.max(200, Math.min(parentW, 500)));
+      // set scratch card width to 70% of viewport width (numeric required by ScratchCard)
+      const vw70 = Math.round(window.innerWidth * 0.7);
+      // optional clamp (min 200, max 500) — adjust as needed or remove clamps
+      const w = Math.round(Math.max(200, Math.min(vw70, 500)));
       setCardWidth(w);
     };
     update();
