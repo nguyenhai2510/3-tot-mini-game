@@ -142,6 +142,7 @@ function App() {
       } else if (touchDelta.current < -50) {
         next();
       }
+
     }
     touchStartX.current = null;
     touchDelta.current = 0;
@@ -169,6 +170,8 @@ function App() {
       circle.remove();
     }, 600);
   };
+
+
 
   return (
     <div className="flex h-screen w-screen items-center justify-center overflow-hidden">
