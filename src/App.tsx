@@ -5,6 +5,47 @@ import images from './assets';
 import ScratchCard from 'react-scratchcard-v2';
 
 const Modal: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose }) => {
+  // responsive width for ScratchCard (number required by the component)
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [cardWidth, setCardWidth] = useState<number>(400);
+  const [revealed, setRevealed] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
+  // current scratch image ratio in your code: 400 x 226 -> ratio = 226/400
+  const aspectRatio = 226 / 400;
+  const confettiCount = 14;
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const update = () => {
+      const parentW = containerRef.current ? containerRef.current.clientWidth : window.innerWidth;
+      // clamp width min/max (adjust min/max as needed)
+      const w = Math.round(Math.max(200, Math.min(parentW, 500)));
+      setCardWidth(w);
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(containerRef.current);
+    window.addEventListener('resize', update);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', update);
+    };
+  }, [containerRef]);
+
+  // prevent background scroll when modal open (avoid page jump / shake)
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    if (open) {
+      document.body.style.overflow = 'hidden';
+      setRevealed(false); // reset reveal each time modal opens
+    } else {
+      document.body.style.overflow = prevOverflow;
+    }
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [open]);
+
   return (
     <div>
       {open && (
@@ -27,21 +68,34 @@ const Modal: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose
               style={{
                 width: "90%",
                 color: "#0DA64B"
-              }}>Cào mã để nhận thưởng</div>
+              }}>Cào mã để xem quà</div>
 
-            <div className="" style={{
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              height: '100%',
-              width: '100%',
-            }}>
+            <div
+              ref={containerRef}
+              // disable browser touch handling on scratch area so canvas receives clean touch events
+              style={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                height: '100%',
+                width: '100%',
+                touchAction: 'none',           // important to prevent scrolling gestures
+                WebkitUserSelect: 'none',
+                WebkitTouchCallout: 'none'
+              }}
+            >
               <ScratchCard
-                width={400} // hoặc width={500} tùy ý
-                height={226} // hoặc height={Math.round(400 * tỉ lệ ảnh)}
+                width={cardWidth} // numeric, responsive based on parent width
+                height={Math.round(cardWidth * aspectRatio)} // keep original ratio
                 image={images.phu_cao}
                 finishPercent={50}
-                onComplete={() => console.log('complete')}
+                onComplete={() => {
+                  // reveal prize + play confetti
+                  setRevealed(true);
+                  setShowConfetti(true);
+                  // stop confetti after 2.8s
+                  setTimeout(() => setShowConfetti(false), 2800);
+                }}
                 brushSize={100}
                 customBrush={{
                   image: images.phu_cao,
@@ -49,9 +103,8 @@ const Modal: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose
                   height: 15
                 }}
               >
-
-
                 <div
+                  className={`prize-inner ${revealed ? 'revealed' : ''}`}
                   style={{
                     color: '#0DA64B',
                     fontWeight: 'bold',
@@ -64,9 +117,25 @@ const Modal: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose
                     fontSize: '1.5rem',
                   }}
                 >
-                  Chúc bạn may mắn lần sau
+                  {/* prize content */}
+                  <div className="prize-card">
+                    <img src={'https://product.hstatic.net/200000852645/product/sua_bot_abbott_glucerna_viet_-_lon_850g_d962f98c01e449b8a2657ef81218343e.png'} alt="prize" className="prize-image" />
+                    <div className="prize-text">Bạn đã trúng 1 phần quà!</div>
+                  </div>
                 </div>
               </ScratchCard>
+
+              {/* confetti (rendered on reveal) */}
+              {showConfetti && (
+                <div className="confetti-wrap" aria-hidden>
+                  {Array.from({ length: confettiCount }).map((_, i) => {
+                    const left = Math.random() * 100;
+                    const delay = (Math.random() * 0.8).toFixed(2);
+                    const bg = ['#FF5A5F', '#FFB400', '#7BD389', '#4D8CFF'][i % 4];
+                    return <span key={i} className="confetti" style={{ left: `${left}%`, background: bg, animationDelay: `${delay}s` }} />;
+                  })}
+                </div>
+              )}
             </div>
 
           </div>
@@ -133,6 +202,10 @@ function App() {
   const onTouchMove: React.TouchEventHandler<HTMLDivElement> = (e) => {
     if (touchStartX.current != null) {
       touchDelta.current = e.touches[0].clientX - touchStartX.current;
+      // nếu người dùng đang vuốt ngang, ngăn browser scroll dọc
+      if (Math.abs(touchDelta.current) > 5) {
+        e.preventDefault();
+      }
     }
   };
   const onTouchEnd: React.TouchEventHandler<HTMLDivElement> = () => {
@@ -189,6 +262,7 @@ function App() {
           onTouchEnd={onTouchEnd}
           onMouseEnter={onMouseEnter}
           onMouseLeave={onMouseLeave}
+          style={{ touchAction: 'pan-x' }} // <-- cho phép thao tác ngang, chặn cuộn dọc
         >
           <div
             className="flex transition-transform duration-500 ease-out"
