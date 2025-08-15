@@ -14,22 +14,62 @@ const Modal: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose
   const aspectRatio = 226 / 400;
   const confettiCount = 14;
 
+  const vwDebounceRef = useRef<number | null>(null);
   useEffect(() => {
-    if (!containerRef.current) return;
+    // compute a reliable viewport width on iOS Safari (visualViewport preferred)
+    const getViewportWidth = () => {
+      // visualViewport gives correct layout viewport width on iOS when UI chrome present
+      // fall back to documentElement/clientWidth / window.innerWidth
+      return window.visualViewport?.width ?? document.documentElement.clientWidth ?? window.innerWidth;
+    };
+
     const update = () => {
-      // set scratch card width to 70% of viewport width (numeric required by ScratchCard)
-      const vw70 = Math.round(window.innerWidth * 0.7);
-      // optional clamp (min 200, max 500) — adjust as needed or remove clamps
+      const vw = getViewportWidth();
+      const vw70 = Math.round(vw * 0.7);
+      // optional clamp (min 200, max 500) — adjust or remove as needed
       const w = Math.round(Math.max(200, Math.min(vw70, 500)));
       setCardWidth(w);
     };
+
+    // small debounce to avoid layout thrash while scratching
+    const debounced = () => {
+      if (vwDebounceRef.current) window.clearTimeout(vwDebounceRef.current);
+      vwDebounceRef.current = window.setTimeout(() => {
+        update();
+        vwDebounceRef.current = null;
+      }, 80);
+    };
+
+    // initial
     update();
-    const ro = new ResizeObserver(update);
-    ro.observe(containerRef.current);
-    window.addEventListener('resize', update);
+
+    // listeners: resize, orientationchange and visualViewport resize (iOS)
+    window.addEventListener('resize', debounced);
+    window.addEventListener('orientationchange', debounced);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', debounced);
+      window.visualViewport.addEventListener('scroll', debounced);
+    }
+
+    // keep ResizeObserver on container for cases when parent changes size
+    let ro: ResizeObserver | null = null;
+    if (containerRef.current) {
+      ro = new ResizeObserver(debounced);
+      ro.observe(containerRef.current);
+    }
+
     return () => {
-      ro.disconnect();
-      window.removeEventListener('resize', update);
+      window.removeEventListener('resize', debounced);
+      window.removeEventListener('orientationchange', debounced);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', debounced);
+        window.visualViewport.removeEventListener('scroll', debounced);
+      }
+      if (ro) ro.disconnect();
+      if (vwDebounceRef.current) {
+        window.clearTimeout(vwDebounceRef.current);
+        vwDebounceRef.current = null;
+      }
     };
   }, [containerRef]);
 
