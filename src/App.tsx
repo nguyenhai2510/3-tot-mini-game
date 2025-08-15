@@ -289,15 +289,15 @@ function App() {
 
   return (
     <div className="flex h-screen w-screen items-center justify-center overflow-hidden">
-      <div className="min-[455px] h-full flex items-center justify-  m-auto  flex-col"
+      <div className="w-screen h-full flex items-center justify-center m-auto flex-col">
 
-      >
+
         {/* <div className="flex items-center justify-center mb-4 mt-10">
           <img src={images.logo} alt="Logo" className="h-20 rounded-full" />
         </div> */}
         {/* Slider */}
         <div
-          className="relative w-full max-w-[500px] overflow-hidden select-none"
+          className="relative w-screen overflow-hidden select-none"
           onTouchStart={onTouchStart}
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
@@ -310,12 +310,13 @@ function App() {
             style={{ transform: `translateX(-${index * 100}%)` }}
           >
             {slides.map((src, i) => (
-              <div key={i} className="flex-shrink-0 w-full">
+              <div key={i} className="flex-shrink-0 w-full h-screen bg-[#06CE65]">
                 <img
                   src={src}
                   alt={`Slide ${i + 1}`}
-                  className="w-full h-auto pointer-events-none "
+                  className="w-full h-screen object-contain pointer-events-none"
                   draggable={false}
+                  style={{ display: 'block' }}
                 />
               </div>
             ))}

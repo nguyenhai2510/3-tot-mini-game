@@ -57,7 +57,7 @@ body {
 /* prize reveal animation */
 .prize-inner {
   transform: scale(0.92);
-  opacity: 0.01; /* very small so it's hidden before full scratch clears */
+  opacity: 0.5; /* very small so it's hidden before full scratch clears */
   transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1), opacity 420ms ease;
   pointer-events: none;
 }
