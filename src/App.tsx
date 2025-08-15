@@ -78,17 +78,18 @@ const Modal: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose
 
 function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [buttonClicked, setButtonClicked] = useState(false);
   const slides = [images.artboard_1, images.artboard_2, images.artboard_3];
   const [index, setIndex] = useState(0);
   const intervalRef = useRef<number | null>(null);
   const touchStartX = useRef<number | null>(null);
   const touchDelta = useRef(0);
 
-  const imagesSwiper = [
-    images.artboard_1,
-    images.artboard_2,
-    images.artboard_3
-  ]
+  // const imagesSwiper = [
+  //   images.artboard_1,
+  //   images.artboard_2,
+  //   images.artboard_3
+  // ]
 
   const goTo = useCallback((i: number) => {
     setIndex(() => (i + slides.length) % slides.length);
@@ -150,6 +151,24 @@ function App() {
   // Mouse pause on hover (desktop)
   const onMouseEnter = pause;
   const onMouseLeave = resume;
+
+  const createRipple = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const button = e.currentTarget;
+    const rect = button.getBoundingClientRect();
+    const circle = document.createElement('span');
+    const diameter = Math.max(button.clientWidth, button.clientHeight);
+    const radius = diameter / 2;
+    circle.style.width = circle.style.height = `${diameter}px`;
+    circle.style.left = `${e.clientX - rect.left - radius}px`;
+    circle.style.top = `${e.clientY - rect.top - radius}px`;
+    circle.className = 'ripple';
+    const existing = button.getElementsByClassName('ripple')[0];
+    if (existing) existing.remove();
+    button.appendChild(circle);
+    window.setTimeout(() => {
+      circle.remove();
+    }, 600);
+  };
 
   return (
     <div className="flex h-screen w-screen items-center justify-center overflow-hidden">
@@ -228,16 +247,16 @@ function App() {
 
       </div>
       <div className="fixed bottom-2 w-full flex justify-center">
-        <div className="bg-blue-500 text-white font-bold px-4 py-2 rounded-full cursor-pointer flex items-center justify-center" onClick={() => setIsModalOpen(true)}
-          style={{
-            backgroundColor: "#0DA64B", width: "80%",
-
-          }}>
+        <button
+          onClick={() => { setIsModalOpen(true); setButtonClicked(true); }}
+          onMouseDown={createRipple}
+          className={`relative overflow-hidden text-white font-bold px-6 py-3 rounded-full cursor-pointer flex items-center justify-center transition-transform duration-200 hover:scale-105 active:scale-95 shadow-md hover:shadow-xl focus:outline-none ${!buttonClicked ? 'pulse' : ''}`}
+          style={{ backgroundColor: "#0DA64B", width: "80%" }}
+        >
           Tham gia chương trình
-        </div>
-
+        </button>
       </div>
-      <Modal open={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <Modal open={isModalOpen} onClose={() => { setIsModalOpen(false); setButtonClicked(false); }} />
     </div >
   );
 }
