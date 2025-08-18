@@ -8,7 +8,9 @@ import artboard3 from './assets/images/Artboard1.png';
 import logo from './assets/images/3tot.png';
 import phuCao from './assets/images/phu_cao.jpg';
 import background from './assets/images/background.png';
-import gift from "./assets/images/gift.png"
+import { useMutation } from '@tanstack/react-query';
+import apis, { BaseUrlImage } from './apis/api';
+import type { Play, Spin } from './types/type';
 
 const images = {
   artboard1,
@@ -539,6 +541,39 @@ const ModalGitSuccess: React.FC<{ open: boolean; onClose: () => void, gift: stri
   );
 };
 
+// Alert modal đơn giản
+type AlertModalProps = {
+  open: boolean;
+  onClose: () => void;
+  title?: string;
+  message?: string;
+};
+
+const AlertModal: React.FC<AlertModalProps> = ({ open, onClose, title = 'Thông báo', message }) => {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative w-[88%] max-w-sm rounded-lg bg-white shadow-lg modal-pop">
+        <div className="flex items-center justify-between px-4 py-3 border-b">
+          <h3 className="text-[#0DA64B] font-semibold">{title}</h3>
+          <div aria-label="Đóng" onClick={onClose} className="p-1 rounded hover:bg-gray-100">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" className="w-5 h-5">
+              <path fill="#0da64b" d="M320 112C434.9 112 528 205.1 528 320C528 434.9 434.9 528 320 528C205.1 528 112 434.9 112 320C112 205.1 205.1 112 320 112zM231 231C221.6 240.4 221.6 255.6 231 264.9L286 319.9L231 374.9C221.6 384.3 221.6 399.5 231 408.8C240.4 418.1 255.6 418.2 264.9 408.8L319.9 353.8L374.9 408.8C384.3 418.2 399.5 418.2 408.8 408.8C418.1 399.4 418.2 384.2 408.8 374.9L353.8 319.9L408.8 264.9C418.2 255.5 418.2 240.3 408.8 231C399.4 221.7 384.2 221.6 374.9 231L319.9 286L264.9 231z" />
+            </svg>
+          </div>
+        </div>
+        <div className="px-4 py-4 text-gray-700">{message}</div>
+        <div className="px-4 pb-4">
+          <div onClick={onClose} className="w-full bg-[#0DA64B] text-white rounded-md py-2 font-semibold text-center">
+            Đóng
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isModalOpenGift, setIsModalOpenGift] = useState(false);
@@ -548,9 +583,17 @@ function App() {
   const intervalRef = useRef<number | null>(null);
   const touchStartX = useRef<number | null>(null);
   const touchDelta = useRef(0);
+  const [phone, setPhone] = useState("");
+  const [isLogin, setIsLogin] = useState(false);
+  const [errPhone, setErrPhone] = useState("");
+  const [alert, setAlert] = useState<{ open: boolean; title?: string; message?: string }>({ open: false });
+
   const handleModalOpenGift = (status: boolean) => {
     setIsModalOpenGift(status);
   };
+
+  const showAlert = useCallback((message: string, title?: string) => setAlert({ open: true, message, title }), []);
+  const closeAlert = useCallback(() => setAlert((p) => ({ ...p, open: false })), []);
 
   const goTo = useCallback((i: number) => {
     setIndex(() => (i + slides.length) % slides.length);
@@ -636,6 +679,68 @@ function App() {
     }, 600);
   };
 
+  const { mutate: play, data: playData } = useMutation<Play, Error, { phone: string }>({
+    mutationFn: (variables: { phone: string; }) => apis.play.countPlay(variables).then(res => res.data),
+    onSuccess: (data: Play) => {
+      console.log('Play successful:', phone, data);
+    },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    onError: (error: any) => {
+      console.error('Play failed:', error?.response?.data?.message);
+      setErrPhone(error?.response?.data?.message || 'Có lỗi xảy ra');
+      setIsLogin(true);
+      showAlert(error?.response?.data?.message || 'Có lỗi xảy ra khi xác thực lượt chơi');
+    },
+  });
+  console.log('Play data:', playData);
+
+  const { mutate: spin, data: spinData } = useMutation<Spin, Error, { phone: string }>({
+    mutationFn: (variables: { phone: string; }) => apis.play.spin(variables).then(res => res.data),
+    onSuccess: (data: Spin) => {
+      if (data.status) {
+        setIsModalOpen(true);
+        setButtonClicked(true);
+        play({ phone: phone });
+      } else {
+        setAlert({
+          open: true,
+          title: 'Thông báo',
+          message: data.msg || 'Có lỗi xảy ra',
+        });
+      }
+      console.log('Spin successful:', data);
+
+    },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    onError: (error: any) => {
+      console.error('Spin failed:', error);
+      setIsLogin(true);
+      setPhone('');
+      showAlert(error?.response?.data?.message || 'Quay thưởng thất bại, vui lòng thử lại');
+    },
+  });
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+
+    setPhone(e.target.value);
+    if (!/^\d{10}$/.test(e.target.value)) {
+      setErrPhone("Số điện thoại không hợp lệ");
+
+      setIsLogin(true);
+    } else {
+      setErrPhone("");
+    }
+  };
+
+  const handleLogin = () => {
+    if (phone === "") {
+      setErrPhone("Số điện thoại không được để trống");
+    } else {
+      play({ phone: phone });
+      setErrPhone("");
+      setIsLogin(false);
+    }
+  };
 
   return (
     <div className="flex h-screen w-screen items-center justify-center overflow-hidden"
@@ -708,7 +813,16 @@ function App() {
       </div>
       <div className="fixed bottom-2 w-full flex justify-center">
         <button
-          onClick={() => { setIsModalOpen(true); setButtonClicked(true); }}
+          onClick={() => {
+            if (phone === "") {
+              setIsLogin(true);
+
+            } else {
+
+              spin({ phone: phone });
+
+            }
+          }}
           onMouseDown={createRipple}
           className={`relative overflow-hidden text-white font-bold px-6 py-3 rounded-full cursor-pointer flex items-center justify-center transition-transform duration-200 hover:scale-105 active:scale-95 shadow-md hover:shadow-xl focus:outline-none ${!buttonClicked ? 'pulse' : ''}`}
           style={{ backgroundColor: "#0DA64B", width: "80%" }}
@@ -716,8 +830,56 @@ function App() {
           Tham gia chương trình
         </button>
       </div>
-      <Modal open={isModalOpen} onClose={() => { setIsModalOpen(false); setButtonClicked(false); }} handleModalOpenGift={handleModalOpenGift} gift={gift} />
-      <ModalGitSuccess open={isModalOpenGift} onClose={() => { setIsModalOpenGift(false); setButtonClicked(false); }} gift={gift} />
+
+      /**
+      login pghone
+      */
+      {
+        isLogin && <div className="fixed inset-0 h-screen w-screen" style={{
+          backgroundImage: `url(${images.background})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          // backgroundColor: "#0DA64B"
+        }}>
+
+          <div className="flex flex-col justify-center items-center p-5 h-full w-full">
+            <div className="w-full bg-white py-5 px-3 rounded-lg border border-[#0DA64B]">
+              <div className="flex justify-center">
+                <img src={logo} alt="" className='w-32' />
+              </div>
+              <div className="">
+                <label htmlFor="phone" className='text-[#0DA64B] font-semibold text-base'>Nhập số điện thoại</label>
+                <input
+                  id="phone"
+                  type="tel"
+                  pattern="[0-9]*"
+                  inputMode="numeric"
+                  className='border border-[#0DA64B] rounded-lg p-2 w-full mt-2 text-gray-700'
+                  placeholder="Nhập số điện thoại"
+                  value={phone}
+                  onChange={handlePhoneChange}
+                />
+              </div>
+              {
+                errPhone && <p className='text-red-500 text-sm'>{errPhone}</p>
+              }
+              <div className="">
+
+                <div className="w-3/4 mx-auto mt-5 bg-[#0DA64B] text-white font-semibold text-center py-2 rounded-lg cursor-pointer hover:bg-green-600 transition-colors duration-200"
+                  onClick={handleLogin}
+                >
+                  Đăng nhập
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      }
+
+      <Modal open={isModalOpen} onClose={() => { setIsModalOpen(false); setButtonClicked(false); }} handleModalOpenGift={handleModalOpenGift} gift={BaseUrlImage + spinData?.prize?.image} />
+      <ModalGitSuccess open={isModalOpenGift} onClose={() => { setIsModalOpenGift(false); setButtonClicked(false); }} gift={BaseUrlImage + spinData?.prize?.image} />
+      <AlertModal open={alert.open} onClose={closeAlert} title={alert.title} message={alert.message} />
     </div >
   );
 }
