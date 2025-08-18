@@ -2,9 +2,9 @@ import './App.css'
 import { useState, useEffect, useRef, useCallback } from 'react';
 
 import ScratchCard from 'react-scratchcard-v2';
-import artboard1 from './assets/images/Artboard1.png';
-import artboard2 from './assets/images/Artboard2.png';
-import artboard3 from './assets/images/Artboard3.png';
+import artboard1 from './assets/images/Artboard2.png';
+import artboard2 from './assets/images/Artboard3.png';
+import artboard3 from './assets/images/Artboard1.png';
 import logo from './assets/images/3tot.png';
 import phuCao from './assets/images/phu_cao.jpg';
 import background from './assets/images/background.png';
