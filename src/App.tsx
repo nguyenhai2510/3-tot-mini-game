@@ -1,10 +1,26 @@
 import './App.css'
 import { useState, useEffect, useRef, useCallback } from 'react';
-import images from './assets';
 
 import ScratchCard from 'react-scratchcard-v2';
+import artboard1 from './assets/images/Artboard1.png';
+import artboard2 from './assets/images/Artboard2.png';
+import artboard3 from './assets/images/Artboard3.png';
+import logo from './assets/images/3tot.png';
+import phuCao from './assets/images/phu_cao.jpg';
+import background from './assets/images/background.png';
+import gift from "./assets/images/gift.png"
 
-const Modal: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose }) => {
+const images = {
+  artboard1,
+  artboard2,
+  artboard3,
+  logo,
+  phuCao,
+  background,
+};
+
+
+const Modal: React.FC<{ open: boolean; onClose: () => void, gift: string, handleModalOpenGift: (status: boolean) => void }> = ({ open, onClose, gift, handleModalOpenGift }) => {
   // responsive width for ScratchCard (number required by the component)
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [cardWidth, setCardWidth] = useState<number>(400);
@@ -128,18 +144,19 @@ const Modal: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose
               <ScratchCard
                 width={cardWidth} // numeric, responsive based on parent width
                 height={Math.round(cardWidth * aspectRatio)} // keep original ratio
-                image={images.phu_cao}
+                image={images.phuCao}
                 finishPercent={50}
                 onComplete={() => {
                   // reveal prize + play confetti
                   setRevealed(true);
                   setShowConfetti(true);
                   // stop confetti after 2.8s
+                  handleModalOpenGift(true);
                   setTimeout(() => setShowConfetti(false), 2800);
                 }}
                 brushSize={100}
                 customBrush={{
-                  image: images.phu_cao,
+                  image: images.phuCao,
                   width: 15,
                   height: 15
                 }}
@@ -160,8 +177,7 @@ const Modal: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose
                 >
                   {/* prize content */}
                   <div className="prize-card">
-                    <img src={'https://product.hstatic.net/200000852645/product/sua_bot_abbott_glucerna_viet_-_lon_850g_d962f98c01e449b8a2657ef81218343e.png'} alt="prize" className="prize-image" />
-                    <div className="prize-text">Bạn đã trúng 1 phần quà!</div>
+                    <img src={gift} alt="prize" className="prize-image" />
                   </div>
                 </div>
               </ScratchCard>
@@ -186,20 +202,218 @@ const Modal: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose
   );
 };
 
+const ModalGitSuccess: React.FC<{ open: boolean; onClose: () => void, gift: string }> = ({ open, onClose, gift }) => {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const stopAtRef = useRef<number>(0);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+
+  // play simple firework SFX using WebAudio (không cần file mp3)
+  const playFireworkSfx = useCallback(() => {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ctx = audioCtxRef.current ?? new (window.AudioContext || (window as any).webkitAudioContext)();
+      audioCtxRef.current = ctx;
+
+      // white noise "pop"
+      const noiseBuffer = ctx.createBuffer(1, ctx.sampleRate * 0.15, ctx.sampleRate);
+      const data = noiseBuffer.getChannelData(0);
+      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+      const noise = ctx.createBufferSource();
+      noise.buffer = noiseBuffer;
+      const nGain = ctx.createGain();
+      nGain.gain.value = 0.35;
+      nGain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.15);
+      noise.connect(nGain).connect(ctx.destination);
+      noise.start();
+
+      // whoosh (sawtooth sweep)
+      const osc = ctx.createOscillator();
+      const oGain = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(700, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(140, ctx.currentTime + 0.35);
+      oGain.gain.value = 0.12;
+      oGain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.35);
+      osc.connect(oGain).connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.36);
+    } catch { /* noop */ }
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+
+    // fireworks canvas
+    const canvas = canvasRef.current!;
+    const ctx = canvas.getContext('2d')!;
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+
+    const size = () => {
+      canvas.width = Math.floor(window.innerWidth * dpr);
+      canvas.height = Math.floor(window.innerHeight * dpr);
+      canvas.style.width = `${window.innerWidth}px`;
+      canvas.style.height = `${window.innerHeight}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+    size();
+    const onResize = () => size();
+    window.addEventListener('resize', onResize);
+
+    type Particle = { x: number; y: number; vx: number; vy: number; alpha: number; color: string; life: number; };
+    type Rocket = { x: number; y: number; vx: number; vy: number; exploded: boolean; color: string; };
+    const particles: Particle[] = [];
+    const rockets: Rocket[] = [];
+    const colors = ['#FF5A5F', '#FFB400', '#7BD389', '#4D8CFF', '#FF6B6B', '#F72585'];
+
+    const launchRocket = () => {
+      const w = window.innerWidth;
+      const x = Math.random() * w * 0.8 + w * 0.1;
+      rockets.push({
+        x, y: window.innerHeight + 10,
+        vx: (Math.random() - 0.5) * 0.8,
+        vy: -(6 + Math.random() * 2.5),
+        exploded: false,
+        color: colors[Math.floor(Math.random() * colors.length)]
+      });
+    };
+
+    // launch for 10s
+    stopAtRef.current = performance.now() + 10000;
+
+    const explode = (rx: Rocket) => {
+      const count = 40 + Math.floor(Math.random() * 30);
+      for (let i = 0; i < count; i++) {
+        const angle = (Math.PI * 2 * i) / count + Math.random() * 0.25;
+        const speed = 2 + Math.random() * 3.5;
+        particles.push({
+          x: rx.x, y: rx.y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          alpha: 1,
+          color: rx.color,
+          life: 60 + Math.floor(Math.random() * 40),
+        });
+      }
+      // play sfx per burst
+      playFireworkSfx();
+    };
+
+    const step = () => {
+      const now = performance.now();
+      ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+
+      // launch cadence
+      if (now < stopAtRef.current && Math.random() < 0.12) launchRocket();
+
+      // update rockets
+      for (let i = rockets.length - 1; i >= 0; i--) {
+        const r = rockets[i];
+        r.x += r.vx;
+        r.y += r.vy;
+        r.vy += 0.06; // gravity
+        // explode when apex reached or high enough
+        if (!r.exploded && (r.vy > -0.5 || r.y < window.innerHeight * 0.35)) {
+          r.exploded = true;
+          explode(r);
+          rockets.splice(i, 1);
+          continue;
+        }
+        // draw rocket
+        ctx.beginPath();
+        ctx.fillStyle = r.color;
+        ctx.arc(r.x, r.y, 2.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // update particles
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vx *= 0.985; // air drag
+        p.vy = p.vy * 0.985 + 0.03; // gravity
+        p.alpha *= 0.985;
+        p.life -= 1;
+
+        ctx.globalAlpha = Math.max(0, p.alpha);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(p.x, p.y, 2, 2);
+        ctx.globalAlpha = 1;
+
+        if (p.life <= 0 || p.alpha < 0.02) {
+          particles.splice(i, 1);
+        }
+      }
+
+      rafRef.current = requestAnimationFrame(step);
+
+      // stop loop khi đã quá 10s và không còn hạt/rocket
+      if (now > stopAtRef.current && rockets.length === 0 && particles.length === 0) {
+        if (rafRef.current) cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+        return;
+      }
+    };
+
+    rafRef.current = requestAnimationFrame(step);
+
+    // also fire the first sfx immediately for quick feedback
+    playFireworkSfx();
+
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      window.removeEventListener('resize', onResize);
+    };
+  }, [open, playFireworkSfx]);
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 h-screen w-screen">
+      <div
+        className="absolute inset-0"
+        style={{
+          backgroundImage: `url(${images.background})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        }}
+      />
+      {/* Fireworks layer */}
+      <canvas
+        ref={canvasRef}
+        className="pointer-events-none absolute inset-0"
+        aria-hidden
+      />
+      {/* Content */}
+      <div className="relative flex items-center justify-center h-full">
+        <img src={gift} alt="Gift" className="w-full h-full object-contain modal-pop" />
+        <div className="absolute bottom-5 w-full flex justify-center">
+          <div
+            onClick={onClose}
+            className="bg-white text-black px-4 py-2 rounded w-3/4 text-center font-semibold modal-pop"
+            style={{ color: "#0DA64B" }}
+          >
+            Đã nhận
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isModalOpenGift, setIsModalOpenGift] = useState(false);
   const [buttonClicked, setButtonClicked] = useState(false);
-  const slides = [images.artboard_1, images.artboard_2, images.artboard_3];
+  const slides = [images.artboard1, images.artboard2, images.artboard3];
   const [index, setIndex] = useState(0);
   const intervalRef = useRef<number | null>(null);
   const touchStartX = useRef<number | null>(null);
   const touchDelta = useRef(0);
-
-  // const imagesSwiper = [
-  //   images.artboard_1,
-  //   images.artboard_2,
-  //   images.artboard_3
-  // ]
+  const handleModalOpenGift = (status: boolean) => {
+    setIsModalOpenGift(status);
+  };
 
   const goTo = useCallback((i: number) => {
     setIndex(() => (i + slides.length) % slides.length);
@@ -286,16 +500,15 @@ function App() {
   };
 
 
-
   return (
-    <div className="flex h-screen w-screen items-center justify-center overflow-hidden">
+    <div className="flex h-screen w-screen items-center justify-center overflow-hidden"
+      style={{
+        backgroundImage: `url(${images.background})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }}>
       <div className="w-screen h-full flex items-center justify-center m-auto flex-col">
 
-
-        {/* <div className="flex items-center justify-center mb-4 mt-10">
-          <img src={images.logo} alt="Logo" className="h-20 rounded-full" />
-        </div> */}
-        {/* Slider */}
         <div
           className="relative w-screen overflow-hidden select-none"
           onTouchStart={onTouchStart}
@@ -310,7 +523,7 @@ function App() {
             style={{ transform: `translateX(-${index * 100}%)` }}
           >
             {slides.map((src, i) => (
-              <div key={i} className="flex-shrink-0 w-full h-screen bg-[#06CE65]">
+              <div key={i} className="flex-shrink-0 w-full h-screen ">
                 <img
                   src={src}
                   alt={`Slide ${i + 1}`}
@@ -333,16 +546,7 @@ function App() {
               />
             ))}
           </div>
-          {/* Prev / Next (optional) */}
-          {/* <button
-            aria-label="Previous slide"
-            onClick={prev}
-            className="absolute top-1/2 -translate-y-1/2 left-2 bg-black  size-[40px] rounded-full text-sm"
-            style={{ color: "#0DA64B" }}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" style={{ color: "#0DA64B", fill: "#0DA64B" }}>
-              <path d="M439.1 297.4C451.6 309.9 451.6 330.2 439.1 342.7L279.1 502.7C266.6 515.2 246.3 515.2 233.8 502.7C221.3 490.2 221.3 469.9 233.8 457.4L371.2 320L233.9 182.6C221.4 170.1 221.4 149.8 233.9 137.3C246.4 124.8 266.7 124.8 279.2 137.3L439.2 297.3z" /></svg>
-          </button> */}
+
           <div
             aria-label="Previous slide"
             onClick={prev}
@@ -375,7 +579,8 @@ function App() {
           Tham gia chương trình
         </button>
       </div>
-      <Modal open={isModalOpen} onClose={() => { setIsModalOpen(false); setButtonClicked(false); }} />
+      <Modal open={isModalOpen} onClose={() => { setIsModalOpen(false); setButtonClicked(false); }} handleModalOpenGift={handleModalOpenGift} gift={gift} />
+      <ModalGitSuccess open={isModalOpenGift} onClose={() => { setIsModalOpenGift(false); setButtonClicked(false); }} gift={gift} />
     </div >
   );
 }
