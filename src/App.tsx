@@ -24,13 +24,150 @@ const Modal: React.FC<{ open: boolean; onClose: () => void, gift: string, handle
   // responsive width for ScratchCard (number required by the component)
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [cardWidth, setCardWidth] = useState<number>(400);
+  const vwDebounceRef = useRef<number | null>(null);
   const [revealed, setRevealed] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
   // current scratch image ratio in your code: 400 x 226 -> ratio = 226/400
   const aspectRatio = 226 / 400;
   const confettiCount = 14;
 
-  const vwDebounceRef = useRef<number | null>(null);
+  // === Scratch sound refs ===
+  const scratchAudioCtxRef = useRef<AudioContext | null>(null);
+  const scratchNoiseBufRef = useRef<AudioBuffer | null>(null);
+  const scratchSrcRef = useRef<AudioBufferSourceNode | null>(null);
+  const scratchGainRef = useRef<GainNode | null>(null);
+  const scratchFilterRef = useRef<BiquadFilterNode | null>(null);
+  const lastPtRef = useRef<{ x: number; y: number; t: number } | null>(null);
+
+  const ensureScratchAudio = useCallback(() => {
+    if (!scratchAudioCtxRef.current) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      scratchAudioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+    const ctx = scratchAudioCtxRef.current!;
+    if (!scratchNoiseBufRef.current) {
+      const buf = ctx.createBuffer(1, ctx.sampleRate * 1, ctx.sampleRate); // 1s loop
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+      scratchNoiseBufRef.current = buf;
+    }
+  }, []);
+
+  const startScratchSound = useCallback((x: number, y: number) => {
+    ensureScratchAudio();
+    const ctx = scratchAudioCtxRef.current!;
+    const src = ctx.createBufferSource();
+    src.buffer = scratchNoiseBufRef.current!;
+    src.loop = true;
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = 800; // sẽ modulate theo tốc độ tay
+    filter.Q.value = 1.0;
+
+    const gain = ctx.createGain();
+    gain.gain.value = 0;
+
+    src.connect(filter).connect(gain).connect(ctx.destination);
+    src.start();
+
+    // fade in nhanh để tránh "pop"
+    const now = ctx.currentTime;
+    gain.gain.linearRampToValueAtTime(0.12, now + 0.05);
+
+    scratchSrcRef.current = src;
+    scratchGainRef.current = gain;
+    scratchFilterRef.current = filter;
+    lastPtRef.current = { x, y, t: performance.now() };
+  }, [ensureScratchAudio]);
+
+  const updateScratchSound = useCallback((x: number, y: number) => {
+    const ctx = scratchAudioCtxRef.current;
+    const filter = scratchFilterRef.current;
+    const gain = scratchGainRef.current;
+    if (!ctx || !filter || !gain) return;
+
+    const nowMs = performance.now();
+    const last = lastPtRef.current;
+    if (last) {
+      const dx = x - last.x;
+      const dy = y - last.y;
+      const dt = Math.max(1, nowMs - last.t); // ms
+      const speed = Math.sqrt(dx * dx + dy * dy) / dt; // px/ms
+
+      // map speed -> freq (300..2000 Hz) và gain (0.06..0.18)
+      const freq = 300 + Math.min(1, speed * 6) * 1700;
+      const targetGain = 0.06 + Math.min(0.12, speed * 0.5);
+
+      filter.frequency.setTargetAtTime(freq, ctx.currentTime, 0.02);
+      gain.gain.setTargetAtTime(targetGain, ctx.currentTime, 0.03);
+    }
+    lastPtRef.current = { x, y, t: nowMs };
+  }, []);
+
+  const stopScratchSound = useCallback(() => {
+    const ctx = scratchAudioCtxRef.current;
+    const src = scratchSrcRef.current;
+    const gain = scratchGainRef.current;
+    if (ctx && src && gain) {
+      const now = ctx.currentTime;
+      gain.gain.cancelScheduledValues(now);
+      gain.gain.setTargetAtTime(0, now, 0.05);
+      try { src.stop(now + 0.12); } catch { /* noop */ }
+    }
+    scratchSrcRef.current = null;
+    scratchGainRef.current = null;
+    scratchFilterRef.current = null;
+    lastPtRef.current = null;
+  }, []);
+
+  // attach scratch sound listeners to the container (sự kiện sẽ bubble từ canvas lên)
+  useEffect(() => {
+    if (!open || !containerRef.current) return;
+    const el = containerRef.current;
+
+    const getXY = (e: MouseEvent | TouchEvent) => {
+      const rect = el.getBoundingClientRect();
+      if ('touches' in e && e.touches.length) {
+        return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } else if ((e as any).clientX != null) {
+        const me = e as MouseEvent;
+        return { x: me.clientX - rect.left, y: me.clientY - rect.top };
+      }
+      return { x: 0, y: 0 };
+    };
+
+    const onDown = (e: MouseEvent | TouchEvent) => {
+      const { x, y } = getXY(e);
+      startScratchSound(x, y);
+    };
+    const onMove = (e: MouseEvent | TouchEvent) => {
+      const { x, y } = getXY(e);
+      updateScratchSound(x, y);
+    };
+    const onUp = () => stopScratchSound();
+
+    el.addEventListener('mousedown', onDown, { passive: true });
+    el.addEventListener('mousemove', onMove, { passive: true });
+    window.addEventListener('mouseup', onUp, { passive: true });
+    el.addEventListener('touchstart', onDown, { passive: true });
+    el.addEventListener('touchmove', onMove, { passive: true });
+    window.addEventListener('touchend', onUp, { passive: true });
+    window.addEventListener('touchcancel', onUp, { passive: true });
+
+    return () => {
+      el.removeEventListener('mousedown', onDown as EventListener);
+      el.removeEventListener('mousemove', onMove as EventListener);
+      window.removeEventListener('mouseup', onUp as EventListener);
+      el.removeEventListener('touchstart', onDown as EventListener);
+      el.removeEventListener('touchmove', onMove as EventListener);
+      window.removeEventListener('touchend', onUp as EventListener);
+      window.removeEventListener('touchcancel', onUp as EventListener);
+      stopScratchSound();
+    };
+  }, [open, startScratchSound, updateScratchSound, stopScratchSound]);
+
   useEffect(() => {
     // compute a reliable viewport width on iOS Safari (visualViewport preferred)
     const getViewportWidth = () => {
