@@ -831,9 +831,7 @@ function App() {
         </button>
       </div>
 
-      /**
-      login pghone
-      */
+
       {
         isLogin && <div className="fixed inset-0 h-screen w-screen" style={{
           backgroundImage: `url(${images.background})`,
