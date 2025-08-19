@@ -383,10 +383,23 @@ const ModalGitSuccess: React.FC<{ open: boolean; onClose: () => void, gift: stri
   useEffect(() => {
     if (!open) return;
 
+    // iOS detect + reduced motion
+    const isIOS =
+      /iP(hone|od|ad)/.test(navigator.platform) ||
+      (navigator.userAgent.includes('Mac') && 'ontouchend' in document);
+    const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+
+    if (prefersReducedMotion) {
+      // Người dùng yêu cầu giảm chuyển động -> không chạy pháo hoa
+      return;
+    }
+
     // fireworks canvas
     const canvas = canvasRef.current!;
     const ctx = canvas.getContext('2d')!;
-    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    // Giới hạn DPR để giảm tải GPU ở iPhone
+    const MAX_DPR = isIOS ? 1.5 : 2;
+    const dpr = Math.min(MAX_DPR, Math.max(1, window.devicePixelRatio || 1));
 
     const size = () => {
       canvas.width = Math.floor(window.innerWidth * dpr);
@@ -405,6 +418,11 @@ const ModalGitSuccess: React.FC<{ open: boolean; onClose: () => void, gift: stri
     const rockets: Rocket[] = [];
     const colors = ['#FF5A5F', '#FFB400', '#7BD389', '#4D8CFF', '#FF6B6B', '#F72585'];
 
+    // Giảm mật độ trên iOS để mượt hơn
+    const spawnProb = isIOS ? 0.08 : 0.12;
+    const particleMin = isIOS ? 24 : 40;
+    const particleRand = isIOS ? 18 : 30;
+
     const launchRocket = () => {
       const w = window.innerWidth;
       const x = Math.random() * w * 0.8 + w * 0.1;
@@ -421,7 +439,7 @@ const ModalGitSuccess: React.FC<{ open: boolean; onClose: () => void, gift: stri
     stopAtRef.current = performance.now() + 10000;
 
     const explode = (rx: Rocket) => {
-      const count = 40 + Math.floor(Math.random() * 30);
+      const count = particleMin + Math.floor(Math.random() * particleRand);
       for (let i = 0; i < count; i++) {
         const angle = (Math.PI * 2 * i) / count + Math.random() * 0.25;
         const speed = 2 + Math.random() * 3.5;
@@ -434,7 +452,6 @@ const ModalGitSuccess: React.FC<{ open: boolean; onClose: () => void, gift: stri
           life: 60 + Math.floor(Math.random() * 40),
         });
       }
-      // play sfx per burst
       playFireworkSfx();
     };
 
@@ -443,7 +460,7 @@ const ModalGitSuccess: React.FC<{ open: boolean; onClose: () => void, gift: stri
       ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
 
       // launch cadence
-      if (now < stopAtRef.current && Math.random() < 0.12) launchRocket();
+      if (now < stopAtRef.current && Math.random() < spawnProb) launchRocket();
 
       // update rockets
       for (let i = rockets.length - 1; i >= 0; i--) {
@@ -497,12 +514,23 @@ const ModalGitSuccess: React.FC<{ open: boolean; onClose: () => void, gift: stri
 
     rafRef.current = requestAnimationFrame(step);
 
-    // also fire the first sfx immediately for quick feedback
+    // Tạm dừng khi tab/ứng dụng bị ẩn để tiết kiệm pin/CPU
+    const onVis = () => {
+      if (document.hidden) {
+        if (rafRef.current) cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      } else if (!rafRef.current) {
+        rafRef.current = requestAnimationFrame(step);
+      }
+    };
+    document.addEventListener('visibilitychange', onVis);
+
     playFireworkSfx();
 
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       window.removeEventListener('resize', onResize);
+      document.removeEventListener('visibilitychange', onVis);
     };
   }, [open, playFireworkSfx]);
 
@@ -761,8 +789,8 @@ function App() {
           style={{ touchAction: 'pan-x' }} // <-- cho phép thao tác ngang, chặn cuộn dọc
         >
           <div
-            className="flex transition-transform duration-500 ease-out"
-            style={{ transform: `translateX(-${index * 100}%)` }}
+            className="flex transition-transform duration-500 ease-out will-change-transform"
+            style={{ transform: `translate3d(-${index * 100}%, 0, 0)` }}
           >
             {slides.map((src, i) => (
               <div key={i} className="flex-shrink-0 w-full h-screen ">
@@ -770,6 +798,7 @@ function App() {
                   src={src}
                   alt={`Slide ${i + 1}`}
                   className="w-full h-screen object-contain pointer-events-none"
+                  decoding="async"
                   draggable={false}
                   style={{ display: 'block' }}
                 />
