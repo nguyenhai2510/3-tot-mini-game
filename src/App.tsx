@@ -6,7 +6,7 @@ import artboard1 from './assets/images/Artboard2.png';
 import artboard2 from './assets/images/Artboard3.png';
 import artboard3 from './assets/images/Artboard1.png';
 import logo from './assets/images/3tot.png';
-import phuCao from './assets/images/phu_cao.jpg';
+import phuCao from './assets/images/phu_cao.png';
 import background from './assets/images/background.png';
 import { useMutation } from '@tanstack/react-query';
 import apis, { BaseUrlImage } from './apis/api';
@@ -268,14 +268,13 @@ const Modal: React.FC<{ open: boolean; onClose: () => void, gift: string, handle
 
             <div
               ref={containerRef}
-              // disable browser touch handling on scratch area so canvas receives clean touch events
               style={{
                 display: 'flex',
                 justifyContent: 'center',
                 alignItems: 'center',
                 height: '100%',
                 width: '100%',
-                touchAction: 'none',           // important to prevent scrolling gestures
+                touchAction: 'none',
                 WebkitUserSelect: 'none',
                 WebkitTouchCallout: 'none'
               }}
@@ -767,9 +766,34 @@ function App() {
     }
   };
 
+  // Chiều cao app theo visualViewport (đã trừ UI header/bottom của trình duyệt)
+  useEffect(() => {
+    const setAppHeight = () => {
+      const vv = window.visualViewport;
+      const h = Math.round(vv?.height ?? window.innerHeight);
+      document.documentElement.style.setProperty('--app-height', `${h}px`);
+    };
+    setAppHeight();
+    window.addEventListener('resize', setAppHeight);
+    window.addEventListener('orientationchange', setAppHeight);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', setAppHeight);
+      window.visualViewport.addEventListener('scroll', setAppHeight);
+    }
+    return () => {
+      window.removeEventListener('resize', setAppHeight);
+      window.removeEventListener('orientationchange', setAppHeight);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', setAppHeight);
+        window.visualViewport.removeEventListener('scroll', setAppHeight);
+      }
+    };
+  }, []);
+
   return (
-    <div className="flex h-screen w-screen items-center justify-center overflow-hidden"
+    <div className="flex w-screen items-center justify-center overflow-hidden"
       style={{
+        height: 'var(--app-height, 100dvh)', // dùng chiều cao thực tế
         backgroundImage: `url(${images.background})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
@@ -783,21 +807,22 @@ function App() {
           onTouchEnd={onTouchEnd}
           onMouseEnter={onMouseEnter}
           onMouseLeave={onMouseLeave}
-          style={{ touchAction: 'pan-x' }} // <-- cho phép thao tác ngang, chặn cuộn dọc
+          style={{ touchAction: 'pan-x' }}
         >
+          {/* cho phép thao tác ngang, chặn cuộn dọc */}
           <div
             className="flex transition-transform duration-500 ease-out will-change-transform"
             style={{ transform: `translate3d(-${index * 100}%, 0, 0)` }}
           >
             {slides.map((src, i) => (
-              <div key={i} className="flex-shrink-0 w-full h-screen ">
+              <div key={i} className="flex-shrink-0 w-full" style={{ height: 'var(--app-height, 100dvh)' }}>
                 <img
                   src={src}
                   alt={`Slide ${i + 1}`}
-                  className="w-full h-screen object-contain pointer-events-none"
+                  className="w-full object-contain pointer-events-none"
                   decoding="async"
                   draggable={false}
-                  style={{ display: 'block' }}
+                  style={{ display: 'block', height: 'var(--app-height, 100dvh)' }}
                 />
               </div>
             ))}
@@ -837,7 +862,7 @@ function App() {
         </div>
 
       </div>
-      <div className="fixed bottom-2 w-full flex justify-center">
+      <div className="fixed bottom-2 w-full flex justify-center" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
         <button
           onClick={() => {
             if (phone === "") {
@@ -857,21 +882,18 @@ function App() {
         </button>
       </div>
 
-
-      {
-        isLogin && <div className="fixed inset-0 " style={{
+      {isLogin && (
+        <div className="fixed inset-0 " style={{
           backgroundImage: `url(${images.background})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
-          // backgroundColor: "#0DA64B"
         }}>
-
           <div className="flex flex-col justify-center items-center p-5 h-full w-full">
             <div className="w-full bg-white py-5 px-3 rounded-lg border border-[#0DA64B]">
               <div className="flex justify-center">
                 <img src={logo} alt="" className='w-32' />
               </div>
-              <div className="">
+              <div>
                 <label htmlFor="phone" className='text-[#0DA64B] font-semibold text-base'>Nhập số điện thoại</label>
                 <input
                   id="phone"
@@ -884,25 +906,22 @@ function App() {
                   onChange={handlePhoneChange}
                 />
               </div>
-              {
-                errPhone && <p className='text-red-500 text-sm'>{errPhone}</p>
-              }
-              <div className="">
-
-                <div className="w-3/4 mx-auto mt-5 bg-[#0DA64B] text-white font-semibold text-center py-2 rounded-lg cursor-pointer hover:bg-green-600 transition-colors duration-200"
+              {errPhone && <p className='text-red-500 text-sm'>{errPhone}</p>}
+              <div>
+                <div
+                  className="w-3/4 mx-auto mt-5 bg-[#0DA64B] text-white font-semibold text-center py-2 rounded-lg cursor-pointer hover:bg-green-600 transition-colors duration-200"
                   onClick={handleLogin}
                 >
                   Đăng nhập
                 </div>
               </div>
-
             </div>
           </div>
         </div>
-      }
+      )}
 
-      <Modal open={isModalOpen} onClose={() => { setIsModalOpen(false); setButtonClicked(false); }} handleModalOpenGift={handleModalOpenGift} gift={BaseUrlImage + spinData?.prize?.image} />
-      <ModalGitSuccess open={isModalOpenGift} onClose={() => { setIsModalOpenGift(false); setButtonClicked(false); }} gift={BaseUrlImage + spinData?.prize?.image} />
+      <Modal open={isModalOpen} onClose={() => { setIsModalOpen(false); setButtonClicked(false); }} handleModalOpenGift={handleModalOpenGift} gift={BaseUrlImage + (spinData?.prize?.image ?? '')} />
+      <ModalGitSuccess open={isModalOpenGift} onClose={() => { setIsModalOpenGift(false); setButtonClicked(false); }} gift={BaseUrlImage + (spinData?.prize?.image ?? '')} />
       <AlertModal open={alert.open} onClose={closeAlert} title={alert.title} message={alert.message} />
     </div >
   );
