@@ -79,7 +79,7 @@ const Modal: React.FC<Props> = ({ open, onClose, gift, handleModalOpenGift }) =>
             try {
                 const percent = Number(sc.getPercent().toFixed(0));
                 if (infoRef.current) infoRef.current.textContent = percent + '%';
-                if (!completed && percent >= 50) {
+                if (!completed && percent >= 70) {
                     completed = true;
                     try { sc.clear(); } catch {
                         //
