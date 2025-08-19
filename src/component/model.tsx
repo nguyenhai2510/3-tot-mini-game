@@ -129,49 +129,41 @@ const Modal: React.FC<Props> = ({ open, onClose, gift, handleModalOpenGift }) =>
                     Cào mã để xem quà
                 </div>
 
-                {
-                    gift && (
-                        <div
-                            ref={wrapperRef}
-                            className="flex-1 flex items-center justify-center relative overflow-hidden"
-                            style={{
-                                // backgroundImage: `url(${gift})`, // bỏ: sẽ dùng lớp riêng để blur
-                                backgroundSize: 'contain',
-                                backgroundPosition: 'center',
-                                backgroundRepeat: 'no-repeat',
-                            }}
-                        >
-                            {/* Lớp nền blur */}
-                            <div
-                                aria-hidden
-                                className="absolute inset-0 pointer-events-none"
-                                style={{
-                                    backgroundImage: `url(${gift})`,
-                                    backgroundSize: 'contain',
-                                    backgroundPosition: 'center',
-                                    backgroundRepeat: 'no-repeat',
-                                    filter: 'blur(10px)',
-                                    transform: 'scale(1.06)', // tránh viền đen do blur
-                                    zIndex: 0,
-                                }}
-                            />
 
-                            {/* nơi mount scratchcard-js */}
-                            <div
-                                ref={mountRef}
-                                style={{
-                                    width: '100%',
-                                    height: '100%',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    position: 'relative',
-                                    zIndex: 1, // trên lớp blur
-                                }}
-                            />
-                        </div>
-                    )
-                }
+                <div
+                    ref={wrapperRef}
+                    className="flex-1 flex items-center justify-center"
+
+                >
+                    {/* Lớp nền blur */}
+                    <div
+                        aria-hidden
+                        className="absolute inset-0 pointer-events-none"
+                        style={{
+                            backgroundImage: `url(${gift})`,
+                            backgroundSize: 'contain',
+                            backgroundPosition: 'center',
+                            backgroundRepeat: 'no-repeat',
+                            filter: 'blur(10px)',
+                            transform: 'scale(1.06)', // tránh viền đen do blur
+                            zIndex: 0,
+                        }}
+                    />
+
+                    {/* nơi mount scratchcard-js */}
+                    <div
+                        ref={mountRef}
+                        style={{
+                            width: '100%',
+                            height: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            position: 'relative',
+                            zIndex: 1, // trên lớp blur
+                        }}
+                    />
+                </div>
 
 
                 {/* <div ref={infoRef} className="text-center text-sm text-gray-500 mt-2 sc__infos" /> */}

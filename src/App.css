@@ -164,3 +164,7 @@ body {
   padding-left: max(env(safe-area-inset-left), 12px);
   padding-right: max(env(safe-area-inset-right), 12px);
 }
+
+.sc__inner {
+  display: none;
+}
