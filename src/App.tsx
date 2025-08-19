@@ -859,7 +859,7 @@ function App() {
 
 
       {
-        isLogin && <div className="fixed inset-0 h-screen w-screen" style={{
+        isLogin && <div className="fixed inset-0 " style={{
           backgroundImage: `url(${images.background})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
