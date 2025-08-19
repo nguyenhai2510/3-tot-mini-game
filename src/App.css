@@ -142,7 +142,10 @@ body {
     transform: rotate(360deg);
   }
 }
-
+html,
+body {
+  overscroll-behavior-x: none;
+}
 /* hiệu ứng xuất hiện nhẹ (fade + pop) */
 .modal-pop {
   animation: pop-in 320ms cubic-bezier(0.22, 1, 0.36, 1);
@@ -156,4 +159,8 @@ body {
     opacity: 1;
     transform: scale(1);
   }
+}
+.app-root {
+  padding-left: max(env(safe-area-inset-left), 12px);
+  padding-right: max(env(safe-area-inset-right), 12px);
 }

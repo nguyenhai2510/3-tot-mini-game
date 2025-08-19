@@ -30,7 +30,7 @@ const Modal: React.FC<{ open: boolean; onClose: () => void, gift: string, handle
   const [revealed, setRevealed] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
   // current scratch image ratio in your code: 400 x 226 -> ratio = 226/400
-  const aspectRatio = 800 / 400;
+  const aspectRatio = 16 / 9;
   const confettiCount = 14;
 
   // === Scratch sound refs ===
@@ -246,11 +246,13 @@ const Modal: React.FC<{ open: boolean; onClose: () => void, gift: string, handle
     <div>
       {open && (
         <div className="fixed inset-0 flex items-center justify-center bg-gray-500/45 bg-opacity-100"
-          onClick={onClose}>
+        // onClick={onClose}
+        >
           <div className="bg-white p-4 rounded-lg relative"
             onClick={(e) => e.stopPropagation()}
             style={{
-              width: "90%"
+              width: "90%",
+              maxHeight: "85%"
             }}>
             <div className="absolute top-2 right-2 z-10 size-9"
               onClick={onClose}>
@@ -292,7 +294,7 @@ const Modal: React.FC<{ open: boolean; onClose: () => void, gift: string, handle
                   handleModalOpenGift(true);
                   setTimeout(() => setShowConfetti(false), 2800);
                 }}
-                brushSize={100}
+                brushSize={450}
                 customBrush={{
                   image: images.phuCao,
                   width: 15,
@@ -788,6 +790,10 @@ function App() {
         window.visualViewport.removeEventListener('scroll', setAppHeight);
       }
     };
+  }, []);
+
+  useEffect(() => {
+    history.replaceState(null, '', location.href);
   }, []);
 
   return (
