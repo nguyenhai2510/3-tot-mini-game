@@ -144,8 +144,8 @@ const Modal: React.FC<Props> = ({ open, onClose, gift, handleModalOpenGift }) =>
                             backgroundSize: 'contain',
                             backgroundPosition: 'center',
                             backgroundRepeat: 'no-repeat',
-                            filter: 'blur(10px)',
-                            transform: 'scale(1.06)', // tránh viền đen do blur
+                            // filter: 'blur(10px)',
+                            // transform: 'scale(1.06)', // tránh viền đen do blur
                             zIndex: 0,
                         }}
                     />
