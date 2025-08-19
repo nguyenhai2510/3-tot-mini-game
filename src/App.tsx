@@ -537,7 +537,7 @@ const ModalGitSuccess: React.FC<{ open: boolean; onClose: () => void, gift: stri
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 h-screen w-screen s" style={{
+    <div className="fixed inset-0 " style={{
       backgroundImage: `url(${images.background})`,
       backgroundSize: 'cover',
       backgroundPosition: 'center',
