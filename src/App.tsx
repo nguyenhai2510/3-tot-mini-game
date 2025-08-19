@@ -537,15 +537,12 @@ const ModalGitSuccess: React.FC<{ open: boolean; onClose: () => void, gift: stri
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 h-screen w-screen">
-      <div
-        className="absolute inset-0"
-        style={{
-          backgroundImage: `url(${images.background})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-        }}
-      />
+    <div className="fixed inset-0 h-screen w-screen s" style={{
+      backgroundImage: `url(${images.background})`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+    }}>
+
       {/* Fireworks layer */}
       <canvas
         ref={canvasRef}
@@ -558,7 +555,7 @@ const ModalGitSuccess: React.FC<{ open: boolean; onClose: () => void, gift: stri
         <div className="absolute bottom-5 w-full flex justify-center">
           <div
             onClick={onClose}
-            className="bg-white text-black px-4 py-2 rounded w-3/4 text-center font-semibold modal-pop"
+            className="bg-white text-black px-4 py-2 rounded w-3/4 text-center font-semibold modal-pop absolute bottom-5"
             style={{ color: "#0DA64B" }}
           >
             Đã nhận
