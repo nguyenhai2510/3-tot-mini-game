@@ -1,7 +1,7 @@
 import './App.css'
 import { useState, useEffect, useRef, useCallback } from 'react';
 
-import ScratchCard from 'react-scratchcard-v2';
+
 import artboard1 from './assets/images/Artboard2.png';
 import artboard2 from './assets/images/Artboard3.png';
 import artboard3 from './assets/images/Artboard1.png';
@@ -11,6 +11,7 @@ import background from './assets/images/background.png';
 import { useMutation } from '@tanstack/react-query';
 import apis, { BaseUrlImage } from './apis/api';
 import type { Play, Spin } from './types/type';
+import Modal from './component/model';
 
 const images = {
   artboard1,
@@ -22,325 +23,7 @@ const images = {
 };
 
 
-const Modal: React.FC<{ open: boolean; onClose: () => void, gift: string, handleModalOpenGift: (status: boolean) => void }> = ({ open, onClose, gift, handleModalOpenGift }) => {
-  // responsive width for ScratchCard (number required by the component)
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const [cardWidth, setCardWidth] = useState<number>(400);
-  const vwDebounceRef = useRef<number | null>(null);
-  const [revealed, setRevealed] = useState(false);
-  const [showConfetti, setShowConfetti] = useState(false);
-  // current scratch image ratio in your code: 400 x 226 -> ratio = 226/400
-  const aspectRatio = 16 / 9;
-  const confettiCount = 14;
 
-  // === Scratch sound refs ===
-  const scratchAudioCtxRef = useRef<AudioContext | null>(null);
-  const scratchNoiseBufRef = useRef<AudioBuffer | null>(null);
-  const scratchSrcRef = useRef<AudioBufferSourceNode | null>(null);
-  const scratchGainRef = useRef<GainNode | null>(null);
-  const scratchFilterRef = useRef<BiquadFilterNode | null>(null);
-  const lastPtRef = useRef<{ x: number; y: number; t: number } | null>(null);
-
-  const ensureScratchAudio = useCallback(() => {
-    if (!scratchAudioCtxRef.current) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      scratchAudioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-    }
-    const ctx = scratchAudioCtxRef.current!;
-    if (!scratchNoiseBufRef.current) {
-      const buf = ctx.createBuffer(1, ctx.sampleRate * 1, ctx.sampleRate); // 1s loop
-      const data = buf.getChannelData(0);
-      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-      scratchNoiseBufRef.current = buf;
-    }
-  }, []);
-
-  const startScratchSound = useCallback((x: number, y: number) => {
-    ensureScratchAudio();
-    const ctx = scratchAudioCtxRef.current!;
-    const src = ctx.createBufferSource();
-    src.buffer = scratchNoiseBufRef.current!;
-    src.loop = true;
-
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'bandpass';
-    filter.frequency.value = 800; // sẽ modulate theo tốc độ tay
-    filter.Q.value = 1.0;
-
-    const gain = ctx.createGain();
-    gain.gain.value = 0;
-
-    src.connect(filter).connect(gain).connect(ctx.destination);
-    src.start();
-
-    // fade in nhanh để tránh "pop"
-    const now = ctx.currentTime;
-    gain.gain.linearRampToValueAtTime(0.12, now + 0.05);
-
-    scratchSrcRef.current = src;
-    scratchGainRef.current = gain;
-    scratchFilterRef.current = filter;
-    lastPtRef.current = { x, y, t: performance.now() };
-  }, [ensureScratchAudio]);
-
-  const updateScratchSound = useCallback((x: number, y: number) => {
-    const ctx = scratchAudioCtxRef.current;
-    const filter = scratchFilterRef.current;
-    const gain = scratchGainRef.current;
-    if (!ctx || !filter || !gain) return;
-
-    const nowMs = performance.now();
-    const last = lastPtRef.current;
-    if (last) {
-      const dx = x - last.x;
-      const dy = y - last.y;
-      const dt = Math.max(1, nowMs - last.t); // ms
-      const speed = Math.sqrt(dx * dx + dy * dy) / dt; // px/ms
-
-      // map speed -> freq (300..2000 Hz) và gain (0.06..0.18)
-      const freq = 300 + Math.min(1, speed * 6) * 1700;
-      const targetGain = 0.06 + Math.min(0.12, speed * 0.5);
-
-      filter.frequency.setTargetAtTime(freq, ctx.currentTime, 0.02);
-      gain.gain.setTargetAtTime(targetGain, ctx.currentTime, 0.03);
-    }
-    lastPtRef.current = { x, y, t: nowMs };
-  }, []);
-
-  const stopScratchSound = useCallback(() => {
-    const ctx = scratchAudioCtxRef.current;
-    const src = scratchSrcRef.current;
-    const gain = scratchGainRef.current;
-    if (ctx && src && gain) {
-      const now = ctx.currentTime;
-      gain.gain.cancelScheduledValues(now);
-      gain.gain.setTargetAtTime(0, now, 0.05);
-      try { src.stop(now + 0.12); } catch { /* noop */ }
-    }
-    scratchSrcRef.current = null;
-    scratchGainRef.current = null;
-    scratchFilterRef.current = null;
-    lastPtRef.current = null;
-  }, []);
-
-  // attach scratch sound listeners to the container (sự kiện sẽ bubble từ canvas lên)
-  useEffect(() => {
-    if (!open || !containerRef.current) return;
-    const el = containerRef.current;
-
-    const getXY = (e: MouseEvent | TouchEvent) => {
-      const rect = el.getBoundingClientRect();
-      if ('touches' in e && e.touches.length) {
-        return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } else if ((e as any).clientX != null) {
-        const me = e as MouseEvent;
-        return { x: me.clientX - rect.left, y: me.clientY - rect.top };
-      }
-      return { x: 0, y: 0 };
-    };
-
-    const onDown = (e: MouseEvent | TouchEvent) => {
-      const { x, y } = getXY(e);
-      startScratchSound(x, y);
-    };
-    const onMove = (e: MouseEvent | TouchEvent) => {
-      const { x, y } = getXY(e);
-      updateScratchSound(x, y);
-    };
-    const onUp = () => stopScratchSound();
-
-    el.addEventListener('mousedown', onDown, { passive: true });
-    el.addEventListener('mousemove', onMove, { passive: true });
-    window.addEventListener('mouseup', onUp, { passive: true });
-    el.addEventListener('touchstart', onDown, { passive: true });
-    el.addEventListener('touchmove', onMove, { passive: true });
-    window.addEventListener('touchend', onUp, { passive: true });
-    window.addEventListener('touchcancel', onUp, { passive: true });
-
-    return () => {
-      el.removeEventListener('mousedown', onDown as EventListener);
-      el.removeEventListener('mousemove', onMove as EventListener);
-      window.removeEventListener('mouseup', onUp as EventListener);
-      el.removeEventListener('touchstart', onDown as EventListener);
-      el.removeEventListener('touchmove', onMove as EventListener);
-      window.removeEventListener('touchend', onUp as EventListener);
-      window.removeEventListener('touchcancel', onUp as EventListener);
-      stopScratchSound();
-    };
-  }, [open, startScratchSound, updateScratchSound, stopScratchSound]);
-
-  useEffect(() => {
-    // compute a reliable viewport width on iOS Safari (visualViewport preferred)
-    const getViewportWidth = () => {
-      // visualViewport gives correct layout viewport width on iOS when UI chrome present
-      // fall back to documentElement/clientWidth / window.innerWidth
-      return window.visualViewport?.width ?? document.documentElement.clientWidth ?? window.innerWidth;
-    };
-
-    const update = () => {
-      const vw = getViewportWidth();
-      const vw90 = Math.round(vw * 0.83);
-      // optional clamp (min 200, max 500) — adjust or remove as needed
-      const w = Math.round(Math.max(200, Math.min(vw90, 500)));
-      setCardWidth(w);
-    };
-
-    // small debounce to avoid layout thrash while scratching
-    const debounced = () => {
-      if (vwDebounceRef.current) window.clearTimeout(vwDebounceRef.current);
-      vwDebounceRef.current = window.setTimeout(() => {
-        update();
-        vwDebounceRef.current = null;
-      }, 80);
-    };
-
-    // initial
-    update();
-
-    // listeners: resize, orientationchange and visualViewport resize (iOS)
-    window.addEventListener('resize', debounced);
-    window.addEventListener('orientationchange', debounced);
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', debounced);
-      window.visualViewport.addEventListener('scroll', debounced);
-    }
-
-    // keep ResizeObserver on container for cases when parent changes size
-    let ro: ResizeObserver | null = null;
-    if (containerRef.current) {
-      ro = new ResizeObserver(debounced);
-      ro.observe(containerRef.current);
-    }
-
-    return () => {
-      window.removeEventListener('resize', debounced);
-      window.removeEventListener('orientationchange', debounced);
-      if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', debounced);
-        window.visualViewport.removeEventListener('scroll', debounced);
-      }
-      if (ro) ro.disconnect();
-      if (vwDebounceRef.current) {
-        window.clearTimeout(vwDebounceRef.current);
-        vwDebounceRef.current = null;
-      }
-    };
-  }, [containerRef]);
-
-  // prevent background scroll when modal open (avoid page jump / shake)
-  useEffect(() => {
-    const prevOverflow = document.body.style.overflow;
-    if (open) {
-      document.body.style.overflow = 'hidden';
-      setRevealed(false); // reset reveal each time modal opens
-    } else {
-      document.body.style.overflow = prevOverflow;
-    }
-    return () => {
-      document.body.style.overflow = prevOverflow;
-    };
-  }, [open]);
-
-  return (
-    <div>
-      {open && (
-        <div className="fixed inset-0 flex items-center justify-center bg-gray-500/45 bg-opacity-100"
-        // onClick={onClose}
-        >
-          <div className="bg-white p-4 rounded-lg relative"
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: "90%",
-              maxHeight: "85%"
-            }}>
-            <div className="absolute top-2 right-2 z-10 size-9"
-              onClick={onClose}>
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
-                <path fill="#0da64b" d="M320 112C434.9 112 528 205.1 528 320C528 434.9 434.9 528 320 528C205.1 528 112 434.9 112 320C112 205.1 205.1 112 320 112zM320 576C461.4 576 576 461.4 576 320C576 178.6 461.4 64 320 64C178.6 64 64 178.6 64 320C64 461.4 178.6 576 320 576zM231 231C221.6 240.4 221.6 255.6 231 264.9L286 319.9L231 374.9C221.6 384.3 221.6 399.5 231 408.8C240.4 418.1 255.6 418.2 264.9 408.8L319.9 353.8L374.9 408.8C384.3 418.2 399.5 418.2 408.8 408.8C418.1 399.4 418.2 384.2 408.8 374.9L353.8 319.9L408.8 264.9C418.2 255.5 418.2 240.3 408.8 231C399.4 221.7 384.2 221.6 374.9 231L319.9 286L264.9 231C255.5 221.6 240.3 221.6 231 231z" /></svg>
-            </div>
-            <div className="flex items-center justify-center mb-4 ">
-              <img src={images.logo} alt="Scratch Card" className='rounded-full h-10' />
-            </div>
-            <div className="text-lg font-bold mb-2 t"
-              style={{
-                width: "90%",
-                color: "#0DA64B"
-              }}>Cào mã để xem quà</div>
-
-            <div
-              ref={containerRef}
-              style={{
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                height: '100%',
-                width: '100%',
-                touchAction: 'none',
-                WebkitUserSelect: 'none',
-                WebkitTouchCallout: 'none'
-              }}
-            >
-              <ScratchCard
-                width={cardWidth} // numeric, responsive based on parent width
-                height={Math.round(cardWidth * aspectRatio)} // keep original ratio
-                image={images.phuCao}
-                finishPercent={50}
-                onComplete={() => {
-                  // reveal prize + play confetti
-                  setRevealed(true);
-                  setShowConfetti(true);
-                  // stop confetti after 2.8s
-                  handleModalOpenGift(true);
-                  setTimeout(() => setShowConfetti(false), 2800);
-                }}
-                brushSize={450}
-                customBrush={{
-                  image: images.phuCao,
-                  width: 15,
-                  height: 15
-                }}
-              >
-                <div
-                  className={`prize-inner  ${revealed ? 'revealed' : ''}`}
-                  style={{
-                    color: '#0DA64B',
-                    fontWeight: 'bold',
-                    textAlign: 'center',
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    height: "100%",
-                    width: 'auto',
-                    fontSize: '1.5rem',
-                  }}
-                >
-                  {/* prize content */}
-                  <div className="">
-                    <img src={gift} alt="prize" className=" h-full w-full object-contain" />
-                  </div>
-                </div>
-              </ScratchCard>
-
-              {/* confetti (rendered on reveal) */}
-              {showConfetti && (
-                <div className="confetti-wrap" aria-hidden>
-                  {Array.from({ length: confettiCount }).map((_, i) => {
-                    const left = Math.random() * 100;
-                    const delay = (Math.random() * 0.8).toFixed(2);
-                    const bg = ['#FF5A5F', '#FFB400', '#7BD389', '#4D8CFF'][i % 4];
-                    return <span key={i} className="confetti" style={{ left: `${left}%`, background: bg, animationDelay: `${delay}s` }} />;
-                  })}
-                </div>
-              )}
-            </div>
-
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
 
 const ModalGitSuccess: React.FC<{ open: boolean; onClose: () => void, gift: string }> = ({ open, onClose, gift }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -614,9 +297,14 @@ function App() {
   const [errPhone, setErrPhone] = useState("");
   const [alert, setAlert] = useState<{ open: boolean; title?: string; message?: string }>({ open: false });
 
-  const handleModalOpenGift = (status: boolean) => {
+  const handleModalOpenGift = useCallback((status: boolean) => {
     setIsModalOpenGift(status);
-  };
+  }, []);
+
+  const onCloseScratchModal = useCallback(() => {
+    setIsModalOpen(false);
+    setButtonClicked(false);
+  }, []);
 
   const showAlert = useCallback((message: string, title?: string) => setAlert({ open: true, message, title }), []);
   const closeAlert = useCallback(() => setAlert((p) => ({ ...p, open: false })), []);
@@ -628,16 +316,21 @@ function App() {
   const next = useCallback(() => goTo(index + 1), [goTo, index]);
   const prev = useCallback(() => goTo(index - 1), [goTo, index]);
 
-  // Auto play every 3s
+  // Auto play every 3s (tắt khi có modal mở / form login)
   useEffect(() => {
-    if (intervalRef.current) window.clearInterval(intervalRef.current);
-    intervalRef.current = window.setInterval(() => {
-      setIndex((i) => (i + 1) % slides.length);
-    }, 3000);
+    if (intervalRef.current) {
+      window.clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    if (!isModalOpen && !isLogin && !isModalOpenGift) {
+      intervalRef.current = window.setInterval(() => {
+        setIndex((i) => (i + 1) % slides.length);
+      }, 3000);
+    }
     return () => {
       if (intervalRef.current) window.clearInterval(intervalRef.current);
     };
-  }, [slides.length]);
+  }, [slides.length, isModalOpen, isLogin, isModalOpenGift]);
 
   // Pause autoplay while user interacts (touch / mouse enter)
   const pause = () => {
@@ -926,7 +619,12 @@ function App() {
         </div>
       )}
 
-      <Modal open={isModalOpen} onClose={() => { setIsModalOpen(false); setButtonClicked(false); }} handleModalOpenGift={handleModalOpenGift} gift={BaseUrlImage + (spinData?.prize?.image ?? '')} />
+      <Modal
+        open={isModalOpen}
+        onClose={onCloseScratchModal}
+        handleModalOpenGift={handleModalOpenGift}
+        gift={BaseUrlImage + (spinData?.prize?.image ?? '')}
+      />
       <ModalGitSuccess open={isModalOpenGift} onClose={() => { setIsModalOpenGift(false); setButtonClicked(false); }} gift={BaseUrlImage + (spinData?.prize?.image ?? '')} />
       <AlertModal open={alert.open} onClose={closeAlert} title={alert.title} message={alert.message} />
     </div >

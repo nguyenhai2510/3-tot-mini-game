@@ -15,7 +15,7 @@
     "axios": "^1.11.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "react-scratchcard-v2": "^1.1.1",
+    "scratchcard-js": "^1.5.5",
     "tailwindcss": "^4.1.11"
   },
   "devDependencies": {
