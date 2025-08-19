@@ -30,7 +30,7 @@ const Modal: React.FC<{ open: boolean; onClose: () => void, gift: string, handle
   const [revealed, setRevealed] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
   // current scratch image ratio in your code: 400 x 226 -> ratio = 226/400
-  const aspectRatio = 226 / 400;
+  const aspectRatio = 800 / 400;
   const confettiCount = 14;
 
   // === Scratch sound refs ===
@@ -180,9 +180,9 @@ const Modal: React.FC<{ open: boolean; onClose: () => void, gift: string, handle
 
     const update = () => {
       const vw = getViewportWidth();
-      const vw70 = Math.round(vw * 0.7);
+      const vw90 = Math.round(vw * 0.83);
       // optional clamp (min 200, max 500) — adjust or remove as needed
-      const w = Math.round(Math.max(200, Math.min(vw70, 500)));
+      const w = Math.round(Math.max(200, Math.min(vw90, 500)));
       setCardWidth(w);
     };
 
@@ -300,7 +300,7 @@ const Modal: React.FC<{ open: boolean; onClose: () => void, gift: string, handle
                 }}
               >
                 <div
-                  className={`prize-inner ${revealed ? 'revealed' : ''}`}
+                  className={`prize-inner  ${revealed ? 'revealed' : ''}`}
                   style={{
                     color: '#0DA64B',
                     fontWeight: 'bold',
@@ -308,14 +308,14 @@ const Modal: React.FC<{ open: boolean; onClose: () => void, gift: string, handle
                     display: 'flex',
                     justifyContent: 'center',
                     alignItems: 'center',
-                    height: '100%',
-                    width: '100%',
+                    height: "100%",
+                    width: 'auto',
                     fontSize: '1.5rem',
                   }}
                 >
                   {/* prize content */}
-                  <div className="prize-card">
-                    <img src={gift} alt="prize" className="prize-image" />
+                  <div className="">
+                    <img src={gift} alt="prize" className=" h-full w-full object-contain" />
                   </div>
                 </div>
               </ScratchCard>
@@ -607,7 +607,7 @@ function App() {
   const intervalRef = useRef<number | null>(null);
   const touchStartX = useRef<number | null>(null);
   const touchDelta = useRef(0);
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState("0363613333");
   const [isLogin, setIsLogin] = useState(false);
   const [errPhone, setErrPhone] = useState("");
   const [alert, setAlert] = useState<{ open: boolean; title?: string; message?: string }>({ open: false });
