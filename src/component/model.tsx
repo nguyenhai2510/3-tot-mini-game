@@ -64,7 +64,7 @@ const Modal: React.FC<Props> = ({ open, onClose, gift, handleModalOpenGift }) =>
             clearZoneRadius: 20,
 
             brushSrc: '',                     // Cung cấp giá trị rỗng vì cọ được quản lý bằng JSX
-            percentToFinish: 50,             // Auto-clear at 50%
+            percentToFinish: 35,             // Auto-clear at 35%
             nPoints: 100,
             pointSize: 8,
             callback: () => {
@@ -122,7 +122,7 @@ const Modal: React.FC<Props> = ({ open, onClose, gift, handleModalOpenGift }) =>
                 >
                     {/* Lớp ảnh quà (nền) */}
                     <div className="absolute inset-0 flex items-center justify-center">
-                        <img src={gift} alt="Gift" className="max-w-full max-h-full object-contain " />
+                        <img src={gift} alt="Gift" className="max-w-full max-h-full object-contain  " />
                     </div>
                     {/* Lớp cào (nằm trên) */}
                     <div ref={mountRef} className="absolute inset-0" />
