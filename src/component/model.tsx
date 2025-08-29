@@ -61,7 +61,7 @@ const Modal: React.FC<Props> = ({ open, onClose, gift, handleModalOpenGift }) =>
 
             // Dùng 'clearZoneRadius' để điều chỉnh độ dày nét cào cho SCRATCH_TYPE.LINE
             // Giảm giá trị này để nét cào mảnh hơn
-            clearZoneRadius: 25,
+            clearZoneRadius: 20,
 
             brushSrc: '',                     // Cung cấp giá trị rỗng vì cọ được quản lý bằng JSX
             percentToFinish: 50,             // Auto-clear at 50%
@@ -122,7 +122,7 @@ const Modal: React.FC<Props> = ({ open, onClose, gift, handleModalOpenGift }) =>
                 >
                     {/* Lớp ảnh quà (nền) */}
                     <div className="absolute inset-0 flex items-center justify-center">
-                        <img src={gift} alt="Gift" className="max-w-full max-h-full object-contain blur-xs" />
+                        <img src={gift} alt="Gift" className="max-w-full max-h-full object-contain " />
                     </div>
                     {/* Lớp cào (nằm trên) */}
                     <div ref={mountRef} className="absolute inset-0" />
