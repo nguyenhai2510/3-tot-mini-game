@@ -168,3 +168,16 @@ body {
 .sc__inner {
   display: none;
 }
+
+.swiper-pagination-custom .swiper-pagination-bullet {
+  height: 4px;
+  width: 8px;
+  border-radius: 9999px;
+  background-color: rgba(255, 255, 255, 0.4);
+  transition: background-color 0.3s;
+  opacity: 1;
+}
+
+.swiper-pagination-custom .swiper-pagination-bullet-active {
+  background-color: white;
+}
