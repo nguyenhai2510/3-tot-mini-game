@@ -43,7 +43,7 @@ function App() {
   // const intervalRef = useRef<number | null>(null);
   // const touchStartX = useRef<number | null>(null);
   // const touchDelta = useRef(0);
-  const [phone, setPhone] = useState("0363613333");
+  const [phone, setPhone] = useState("");
   const [isLogin, setIsLogin] = useState(false);
   const [errPhone, setErrPhone] = useState("");
   const [alert, setAlert] = useState<{ open: boolean; title?: string; message?: string }>({ open: false });
