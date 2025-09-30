@@ -131,13 +131,14 @@ function App() {
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 
     setPhone(e.target.value);
-    if (!/^\d{10}$/.test(e.target.value)) {
-      setErrPhone("Số điện thoại không hợp lệ");
+    setIsLogin(true);
+    // if (!/^\d{10}$/.test(e.target.value)) {
+    //   setErrPhone("Số điện thoại không hợp lệ");
 
-      setIsLogin(true);
-    } else {
-      setErrPhone("");
-    }
+
+    // } else {
+    //   setErrPhone("");
+    // }
   };
 
   const handleLogin = () => {
@@ -271,6 +272,7 @@ function App() {
           backgroundImage: `url(${images.background})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
+          zIndex: 10
         }}>
           <div className="flex flex-col justify-center items-center p-5 h-full w-full">
             <div className="w-full bg-white py-5 px-3 rounded-lg border border-[#0DA64B]">
